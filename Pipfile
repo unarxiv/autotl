@@ -13,6 +13,8 @@ scikit-learn = "*"
 
 [dev-packages]
 
+"autopep8" = "*"
+pylint = "*"
 
 
 [requires]
