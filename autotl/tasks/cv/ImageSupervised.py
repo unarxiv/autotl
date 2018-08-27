@@ -1,16 +1,23 @@
 import os
 import numpy as np
+from functools import reduce
 from abc import abstractmethod
-from autotl.fileutils import temp_folder_generator
+
+from sklearn.metrics import accuracy_score
+
 from autotl.fileutils import has_file
-from autotl.fileutils import pickle_from_file
 from autotl.fileutils import ensure_dir
+from autotl.fileutils import pickle_to_file
+from autotl.fileutils import pickle_from_file
+from autotl.fileutils import temp_folder_generator
+
 from autotl.tasks.supervised import Supervised
+from autotl.tasks.cv.constant import Constant
 from autotl.tasks.cv.preprocessor import validate
+from autotl.tasks.cv.preprocessor import OneHotEncoder
+
 from autotl.loss import classification_loss
 from autotl.metric import Accuracy
-from autotl.tasks.cv.preprocessor import OneHotEncoder
-from constant import Constant
 
 
 class ImageSupervised(Supervised):
@@ -61,28 +68,54 @@ class ImageSupervised(Supervised):
         validate(x_train, y_train)
         y_train = self.transform_y(y_train)
 
-
     def transform_y(self, y_train):
         return y_train
+    
+    def predict(self, x_test):
+        if Constant.LIMIT_MEMORY:
+            pass
+        test_loader = self.data_transformer.transform_test(x_test)
+        model = self.load_searcher().load_best_model().produce_model()
+        model.eval()
+        outputs = []
+        for index, inputs in enumerate(test_loader):
+            outputs.append(model(inputs).numpy())
+        output = reduce(lambda x, y: np.concatenate((x,y)), outputs)
+        return self.inverse_transform_y(output)
+
+    def inverse_transform_y(self, output):
+        return output
+
+    def load_searcher(self):
+        return pickle_from_file(os.path.join(self.path, 'searcher'))
+    
+    def save_searcher(self, searcher):
+        pickle_to_file(searcher, os.path.join(self.path, 'searcher'))
+    
+    def evaluate(self, x_test, y_test):
+        y_predict = self.predict(x_test)
+        return accuracy_score(y_test, y_predict)
+
 
 class ImageClassifier(ImageSupervised):
+
     @property
     def loss(self):
         return classification_loss
-    
+
     def transform_y(self, y_train):
         if self.y_encoder is None:
             self.y_encoder = OneHotEncoder()
             self.y_encoder.fit(y_train)
         y_train = self.y_encoder.transform(y_train)
         return y_train
-    
+
     def inverse_transform_y(self, output):
         return self.y_encoder.inverse_transform(output)
 
     def get_n_output_node(self):
         return self.y_encoder.n_classes
-    
+
     @property
     def metric(self):
         return Accuracy
