@@ -1,3 +1,4 @@
+import logging
 import os
 
 from autotl.constant import Constant
@@ -57,6 +58,38 @@ class Searcher(object):
 
     def replace_model(self, graph, model_id):
         pickle_to_file(graph, os.path.join(self.path, str(model_id) + '.h5'))
+
+    def add_model(self, metric_value, loss, graph, model_id):
+        if self.verbose:
+            logging.info('\n [AutoTL]: Saving Model...')
+        pickle_to_file(graph, os.path.join(self.path, str(model_id) + '.h5'))
+        ret = {
+            'model_id': model_id,
+            'loss': loss,
+            'metric_value': metric_value
+        }
+        self.history.append(ret)
+        if model_id == self.get_best_model_id():
+            with open(os.path.join(self.path, 'best_model.txt', 'w')) as f:
+                f.write('best model: ' + str(model_id))
+                f.close()
+
+        if self.verbose:
+            idx = ['model_id', 'loss', 'metric_value']
+            header = ['Model ID', 'Loss', 'Metric Value']
+            line = '|'.join(x.center(24) for x in header)
+            print('+' + '-' * len(line) + '+')
+            print('|' + line + '|')
+            for i, r in enumerate(self.history):
+                print('+' + '-' * len(line) + '+')
+                line = '|'.join(str(r[x]).center(24) for x in idx)
+                print('|' + line + '|')
+            print('+' + '-' * len(line) + '+')
+
+        descriptor = graph.extract_descriptor()
+        self.x_queue.append(descriptor)
+        self.y_queue.append(metric_value)
+        return ret
 
 
 class SearchTree(object):

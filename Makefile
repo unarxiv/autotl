@@ -1,7 +1,8 @@
 default:
 	@echo "Usage:"
-	@echo "\tmake test
-	@echo "\tmake format
+	@echo "\tmake test"
+	@echo "\tmake format"
+	@echo "\tmake docs"
 
 test:
 
@@ -15,3 +16,8 @@ format:
 
 	yapf -i autotl/*.py
 	yapf -i autotl/**/*.py
+
+docs:
+	cd docs && npm run docs:build
+
+.PHONY: docs
