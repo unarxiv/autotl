@@ -11,3 +11,4 @@ X_test = X_test.reshape(X_test.shape + (1,))
 
 clf = ImageClassifier(verbose=True,augment=False)
 clf.fit(X_train,y_train, time_limit=0.5 * 60 * 60)
+clf.evaluate(X_test, y_test)

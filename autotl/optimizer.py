@@ -1,8 +1,14 @@
+import time
+from copy import deepcopy
+from functools import total_ordering
+from queue import PriorityQueue
+
 import numpy as np
+from scipy.linalg import cho_solve, cholesky, solve_triangular
 from scipy.optimize import linear_sum_assignment
-from scipy.linalg import cholesky, cho_solve, solve_triangular
-from autotl.distance import edit_distance_matrix
-from autotl.distance import bourgain_embedding_matrix
+
+from autotl.distance import (bourgain_embedding_matrix, edit_distance,
+                             edit_distance_matrix)
 
 
 class IncrementalGaussianProcess(object):
@@ -53,8 +59,8 @@ class IncrementalGaussianProcess(object):
             raise ValueError("The first_fit function needs to be called first")
 
         train_x, train_y = np.array(train_x), np.array(train_y)
-        up_right_k = self.edit_distance_matrix(
-            self.kernel_lambda, self._x, train_x)
+        up_right_k = self.edit_distance_matrix(self.kernel_lambda, self._x,
+                                               train_x)
         down_left_k = np.transpose(up_right_k)
         down_right_k = self.edit_distance_matrix(self.kernel_lambda, train_x)
         up_k = np.concatenate((self._distance_matrix, up_right_k), axis=1)
@@ -71,8 +77,8 @@ class IncrementalGaussianProcess(object):
 
         self._l_matrix = cholesky(self._k_matrix, lower=True)  # Line 2
 
-        self._alpha_vector = cho_solve(
-            (self._l_matrix, True), self._y)  # Line 3
+        self._alpha_vector = cho_solve((self._l_matrix, True),
+                                       self._y)  # Line 3
 
         return self
 
@@ -84,3 +90,52 @@ class BayesianOptimizer(object):
         self.metric = metric
         self.kernel_lambda = kernel_lambda
         self.beta = beta
+        self.gpr = IncrementalGaussianProcess(kernel_lambda)
+
+    def fit(self, x_queue, y_queue):
+        self.gpr.fit(x_queue, y_queue)
+
+    def optimize_acq(self, model_ids, descriptors, timeout):
+        start_time = time.time()
+        target_graph = None
+        father_id = None
+        descriptors = deepcopy(descriptors)
+        elem_class = Elem
+        if self.metric.higher_better():
+            elem_class = ReverseElem
+        pq = PriorityQueue()
+        temp_list = []
+        for model_id in model_ids:
+            metric_value = self.searcher.get_metric_value_by_id(model_id)
+            temp_list.append((metric_value, model_id))
+        temp_list = sorted(temp_list)
+        for metric_value, model_id in temp_list:
+            graph = self.searcher.load_model_by_id(model_id)
+            graph.clear_operation_history()
+            graph.clear_weights()
+
+
+@total_ordering
+class Elem:
+    def __init__(self, metric_value, father_id, graph):
+        self.father_id = father_id
+        self.graph = graph
+        self.metric_value = metric_value
+
+    def __eq__(self, other):
+        return self.metric_value == other.metric_value
+
+    def __lt__(self, other):
+        return self.metric_value < other.metric_value
+
+
+class ReverseElem(Elem):
+    def __lt__(self, other):
+        return self.metric_value > other.metric_value
+
+
+def contain(descriptors, target_descriptor):
+    for descriptor in descriptors:
+        if edit_distance(descriptor, target_descriptor, 1) < 1e-5:
+            return True
+    return False

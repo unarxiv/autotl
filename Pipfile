@@ -10,6 +10,8 @@ url = "https://pypi.python.org/simple"
 tensorlayer = "*"
 scikit-learn = "*"
 tensorflow-gpu = "*"
+autoflake = "*"
+yapf = "*"
 
 
 [dev-packages]

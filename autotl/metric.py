@@ -4,7 +4,6 @@ from sklearn.metrics import accuracy_score, mean_squared_error
 
 
 class Metric:
-
     @classmethod
     @abstractmethod
     def higher_better(cls):

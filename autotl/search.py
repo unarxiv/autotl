@@ -1,12 +1,24 @@
+import os
+
 from autotl.constant import Constant
-class Search(object):
-    def __init__(self, n_output_node, input_shape, path, metric, loss, verbose,
-                 trainer_args = None,
-                 default_model_len = Constant.MODEL_LEN,
-                 default_model_width = Constant.MODEL_WIDTH,
-                 beta = Constant.BETA,
-                 kernel_lambda = Constant.KERNEL_LAMBDA,
-                 t_min = Constant.T_MIN):
+from autotl.fileutils import pickle_from_file, pickle_to_file
+from autotl.optimizer import BayesianOptimizer
+
+
+class Searcher(object):
+    def __init__(self,
+                 n_output_node,
+                 input_shape,
+                 path,
+                 metric,
+                 loss,
+                 verbose,
+                 trainer_args=None,
+                 default_model_len=Constant.MODEL_LEN,
+                 default_model_width=Constant.MODEL_WIDTH,
+                 beta=Constant.BETA,
+                 kernel_lambda=Constant.KERNEL_LAMBDA,
+                 t_min=Constant.T_MIN):
         if trainer_args is None:
             trainer_args = {}
         self.n_classes = n_output_node
@@ -27,7 +39,25 @@ class Search(object):
         self.training_queue = []
         self.x_queue = []
         self.y_queue = []
-        
+        self.bo = BayesianOptimizer(self, t_min, metric, kernel_lambda, beta)
+
+    def load_model_by_id(self, model_id):
+        return pickle_from_file(os.path.join(self.path, str(model_id + '.h5')))
+
+    def get_best_model_id(self):
+        if self.metric.higher_better():
+            return max(
+                self.history, key=lambda x: x['metric_value'])['model_id']
+        else:
+            return min(
+                self.history, key=lambda x: x['metric_value'])['model_id']
+
+    def load_best_model(self):
+        return self.load_model_by_id(self.get_best_model_id())
+
+    def replace_model(self, graph, model_id):
+        pickle_to_file(graph, os.path.join(self.path, str(model_id) + '.h5'))
+
 
 class SearchTree(object):
     def __init__(self):
@@ -43,16 +73,12 @@ class SearchTree(object):
             self.adj_list[u].append(v)
         if v not in self.adj_list:
             self.adj_list[v] = []
-    
+
     def get_dict(self, u=None):
         if u is None:
             return self.get_dict(self.root)
         children = []
         for v in self.adj_list[u]:
             children.append(self.get_dict(v))
-        ret = {
-            'name': u,
-            'children': children
-        }
+        ret = {'name': u, 'children': children}
         return ret
-        
