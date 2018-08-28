@@ -2,6 +2,9 @@ from queue import Queue
 
 import numpy as np
 
+from autotl.layer_transformer import wider_next_conv
+from autotl.layers import is_layer
+
 
 class NetworkDescriptor:
     CONCAT_CONNECT = 'concat'
@@ -57,7 +60,7 @@ class Graph(object):
         self.adj_list = {}
         self.reverse_adj_list = {}
         self.operation_history = []
-        self.vis = None
+        self.vis = []
         self._add_node(Node(input_shape))
 
     def _add_node(self, node):
@@ -137,6 +140,16 @@ class Graph(object):
             node_list.pop()
 
         return False
+
+    def _search(self, u, start_dim, total_dim, n_add):
+        if (u, start_dim, total_dim, n_add) in self.vis:
+            return
+        self.vis[(u, start_dim, total_dim, n_add)] = True
+        for v, layer_id in self.adj_list[u]:
+            layer = self.layer_list[layer_id]
+
+            if is_layer(layer, 'Conv'):
+                new_layer = 
 
     @property
     def n_nodes(self):
